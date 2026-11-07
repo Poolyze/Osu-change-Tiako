@@ -1,0 +1,413 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Osu3tja 譜面轉換器</title>
+<style>
+:root {
+  --bg: #f6f3ee; --card: #ffffff; --ink: #231f1c; --muted: #6f665e;
+  --line: #e4ddd3; --don: #e5432d; --don-ink: #ffffff; --katsu: #2f8fc2;
+  --ok: #1f8a4c; --warn-bg: #fff4d6; --warn-ink: #6b4a00;
+  --err-bg: #fde7e3; --err-ink: #8c1d10; --focus: #2f8fc2;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #161412; --card: #211e1b; --ink: #f1ece6; --muted: #a39a90;
+    --line: #38332e; --don: #ef5a44; --katsu: #55b1e0; --ok: #4fc283;
+    --warn-bg: #3a2f10; --warn-ink: #f2d98f;
+    --err-bg: #3d1b16; --err-ink: #ffb3a7;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--bg); color: var(--ink);
+  font: 16px/1.6 "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", system-ui, sans-serif;
+}
+main { max-width: 760px; margin: 0 auto; padding: 32px 16px 64px; }
+header { display: flex; align-items: center; gap: 14px; margin-bottom: 24px; }
+.drum {
+  width: 48px; height: 48px; border-radius: 50%; flex: none;
+  background: radial-gradient(circle at 50% 50%, var(--don) 0 38%, var(--card) 39% 52%, var(--katsu) 53%);
+  border: 3px solid var(--ink);
+}
+h1 { margin: 0; font-size: 1.5rem; line-height: 1.2; }
+header p { margin: 2px 0 0; color: var(--muted); font-size: .95rem; }
+.card {
+  background: var(--card); border: 1px solid var(--line); border-radius: 14px;
+  padding: 20px; margin-bottom: 16px;
+}
+.card h2 { margin: 0 0 12px; font-size: 1.1rem; }
+.guide ol { margin: 0; padding-left: 1.3rem; }
+.guide li { margin-bottom: 6px; }
+.guide li::marker { color: var(--don); font-weight: 700; }
+.pick { display: flex; gap: 8px; min-width: 0; }
+.pick select { flex: 1; min-width: 0; }
+.lv {
+  width: 6.5rem; flex: none; padding: 10px 10px; border-radius: 10px; font: inherit;
+  border: 1px solid var(--line); background: var(--bg); color: var(--ink);
+}
+.lv:disabled { opacity: .5; }
+.lv:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.radio { display: block; margin: 6px 0; cursor: pointer; }
+.radio input { margin-right: 6px; accent-color: var(--don); }
+.pathrow { display: flex; gap: 8px; margin-top: 8px; }
+.pathrow input {
+  flex: 1; min-width: 0; padding: 10px 12px; border-radius: 10px; font: inherit;
+  border: 1px solid var(--line); background: var(--bg); color: var(--ink);
+}
+.pathrow input:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.saved { word-break: break-all; }
+code { background: var(--bg); padding: 1px 6px; border-radius: 5px; font-size: .9em; }
+#drop {
+  display: block; text-align: center; cursor: pointer;
+  border: 2px dashed var(--line); border-radius: 14px; padding: 40px 16px;
+  background: var(--card); transition: border-color .15s, background .15s;
+}
+#drop:hover, #drop.over { border-color: var(--don); }
+#drop.over { background: color-mix(in srgb, var(--don) 8%, var(--card)); }
+#drop strong { display: block; font-size: 1.1rem; margin-bottom: 4px; }
+#drop span { color: var(--muted); font-size: .92rem; }
+#drop:focus-within { outline: 3px solid var(--focus); outline-offset: 2px; }
+#file { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.progress { height: 8px; border-radius: 4px; background: var(--line); overflow: hidden; margin-top: 14px; }
+.progress > i { display: block; height: 100%; width: 0; background: var(--don); transition: width .1s; }
+.meta { margin-bottom: 14px; }
+.meta b { font-size: 1.15rem; }
+.meta div { color: var(--muted); font-size: .95rem; }
+.rows { display: grid; gap: 10px; }
+.row { display: grid; grid-template-columns: 7.5rem 1fr; gap: 10px; align-items: center; }
+.row label { font-weight: 600; }
+.row label small { display: block; font-weight: 400; color: var(--muted); font-size: .8rem; }
+select {
+  width: 100%; padding: 10px 12px; border-radius: 10px; font: inherit;
+  border: 1px solid var(--line); background: var(--bg); color: var(--ink);
+}
+select:focus-visible, button:focus-visible, a.btn:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.row.c-Oni label { color: var(--don); }
+.row.c-Hard label { color: #c48a00; }
+.row.c-Normal label { color: var(--ok); }
+.row.c-Easy label { color: var(--katsu); }
+details { margin-top: 14px; color: var(--muted); font-size: .92rem; }
+details summary { cursor: pointer; }
+details select { margin-top: 8px; }
+.note { margin: 6px 0 0; font-size: .85rem; color: var(--muted); }
+.actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 18px; }
+button, a.btn {
+  font: inherit; font-weight: 600; padding: 11px 22px; border-radius: 10px;
+  border: 1px solid var(--line); background: var(--card); color: var(--ink);
+  cursor: pointer; text-decoration: none; display: inline-block;
+}
+button.primary, a.btn.primary { background: var(--don); border-color: var(--don); color: var(--don-ink); }
+button:disabled { opacity: .5; cursor: not-allowed; }
+.banner { border-radius: 10px; padding: 12px 14px; margin-bottom: 16px; }
+.banner.err { background: var(--err-bg); color: var(--err-ink); }
+.banner.warn { background: var(--warn-bg); color: var(--warn-ink); }
+.spinner {
+  display: inline-block; width: 1em; height: 1em; vertical-align: -.15em; margin-right: .5em;
+  border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%;
+  animation: spin .8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spinner { animation-duration: 3s; } }
+.hidden { display: none !important; }
+footer { color: var(--muted); font-size: .85rem; text-align: center; margin-top: 28px; }
+@media (max-width: 520px) { .row { grid-template-columns: 1fr; gap: 4px; } }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <div class="drum" aria-hidden="true"></div>
+    <div>
+      <h1>Osu3tja 譜面轉換器</h1>
+      <p>把 osu! 譜面（.osz）轉成太鼓模擬器用的 TJA</p>
+    </div>
+  </header>
+
+  <div id="error" class="banner err hidden" role="alert"></div>
+
+  <!-- 步驟 1：選檔 -->
+  <section id="step-upload">
+    <div class="card guide">
+      <h2>怎麼使用？三個步驟</h2>
+      <ol>
+        <li><b>準備 .osz 檔。</b>從 osu! 官網下載譜面（建議挑「osu!taiko」模式的譜面），檔案副檔名是 <code>.osz</code>。</li>
+        <li><b>把檔案拖進下方的框框</b>，接著為魔王／困難／普通／簡單選好要用哪一份譜面，按「開始轉換」。</li>
+        <li><b>下載 ZIP 並解壓縮</b>，把整個資料夾放進你的太鼓模擬器（如 TJAPlayer3、太鼓次郎）的歌曲資料夾即可。</li>
+      </ol>
+    </div>
+    <label id="drop" for="file">
+      <input id="file" type="file" accept=".osz">
+      <strong>把 .osz 檔拖曳到這裡，或點擊選擇檔案</strong>
+      <span>單檔上限 <span id="maxmb">500</span> MB。只會讀取譜面與音檔，其他素材（背景、動畫）會被忽略。</span>
+      <div id="upbar" class="progress hidden"><i></i></div>
+    </label>
+    <p id="upstatus" class="note hidden" aria-live="polite"></p>
+  </section>
+
+  <!-- 步驟 2：選難度 -->
+  <section id="step-pick" class="card hidden">
+    <div class="meta"><b id="m-title"></b><div id="m-artist"></div></div>
+    <h2>難度對應</h2>
+    <p class="note" style="margin:-6px 0 12px">為每個太鼓難度選一份 osu! 譜面；選「不輸出」則略過該難度。右側的星數可自訂（1～10），留空就使用預設值。</p>
+    <div class="rows" id="rows"></div>
+    <div id="save-box" class="hidden">
+      <h2 style="margin-top:20px">儲存位置</h2>
+      <label class="radio"><input type="radio" name="save" value="zip" checked> 下載成 ZIP（自己解壓縮，再放進模擬器）</label>
+      <label class="radio"><input type="radio" name="save" value="folder"> 直接存進資料夾（例如太鼓模擬器的歌曲資料夾）</label>
+      <div id="folder-row" class="pathrow hidden">
+        <input id="outdir" type="text" spellcheck="false" aria-label="輸出資料夾路徑"
+               placeholder="貼上資料夾路徑，例如 D:\TJAPlayer3\Songs">
+        <button id="browse" type="button">瀏覽…</button>
+      </div>
+      <p id="folder-note" class="note hidden">會在這個資料夾裡建立一個以歌名命名的子資料夾（已存在就加編號，不會覆蓋）。</p>
+    </div>
+    <details>
+      <summary>進階設定</summary>
+      <label for="enc" style="display:block;margin-top:8px">TJA 檔案編碼</label>
+      <select id="enc">
+        <option value="utf-8-sig">UTF-8（含 BOM，建議；中日文標題都能正常顯示）</option>
+        <option value="utf-8">UTF-8（無 BOM）</option>
+        <option value="shift_jis">Shift-JIS（舊版 TaikoJiro 用；不支援中文字）</option>
+      </select>
+      <p class="note">若在播放器裡看到亂碼，請換一種編碼再轉換一次。</p>
+    </details>
+    <div class="actions">
+      <button id="go" class="primary" type="button">開始轉換</button>
+      <button id="again" type="button">換一首</button>
+    </div>
+  </section>
+
+  <!-- 步驟 3：結果 -->
+  <section id="step-done" class="card hidden">
+    <h2>✔ 轉換完成</h2>
+    <div id="warn" class="banner warn hidden"></div>
+    <p id="saved" class="saved hidden"></p>
+    <p id="next"><b>接下來：</b>下載 ZIP → 解壓縮 → 把整個資料夾（內含 <code>.tja</code> 與音檔）放進播放器的歌曲資料夾，重新掃描歌曲即可。</p>
+    <div class="actions">
+      <a id="dl" class="btn primary" href="#" download>下載 ZIP</a>
+      <button id="back" type="button">調整難度後重轉</button>
+      <button id="again2" type="button">轉換另一首</button>
+    </div>
+  </section>
+
+  <footer>所有檔案都只在你自己的電腦上處理，不會傳到網路上。用完後關閉黑色的執行視窗即可結束程式。</footer>
+</main>
+
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const COURSES = [
+    ["Oni", "魔王", "Oni"], ["Hard", "困難", "Hard"],
+    ["Normal", "普通", "Normal"], ["Easy", "簡單", "Easy"],
+  ];
+  let state = { token: null, charts: [] };
+  let maxMB = 500;
+
+  function showError(msg) {
+    const el = $("error");
+    el.textContent = msg || "";
+    el.classList.toggle("hidden", !msg);
+    if (msg) el.scrollIntoView({ block: "nearest" });
+  }
+  function show(step) {
+    $("step-upload").classList.toggle("hidden", step !== "upload");
+    $("step-pick").classList.toggle("hidden", step !== "pick");
+    $("step-done").classList.toggle("hidden", step !== "done");
+  }
+  function reset() {
+    state = { token: null, charts: [] };
+    $("file").value = "";
+    $("upbar").classList.add("hidden");
+    $("upstatus").classList.add("hidden");
+    showError("");
+    show("upload");
+  }
+
+  // ---- 上傳 ----
+  function upload(file) {
+    showError("");
+    if (!file) return;
+    if (!/\.osz$/i.test(file.name)) { showError("請選擇副檔名為 .osz 的檔案。"); return; }
+    if (file.size > maxMB * 1024 * 1024) { showError("檔案太大了，上限是 " + maxMB + " MB。"); return; }
+    const bar = $("upbar"), fill = bar.firstElementChild, status = $("upstatus");
+    bar.classList.remove("hidden"); status.classList.remove("hidden");
+    fill.style.width = "0";
+    status.innerHTML = '<span class="spinner"></span>讀取中…';
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", "/api/inspect");
+    xhr.setRequestHeader("X-Filename", encodeURIComponent(file.name));
+    xhr.upload.onprogress = (e) => {
+      if (!e.lengthComputable) return;
+      const p = Math.round(e.loaded / e.total * 100);
+      fill.style.width = p + "%";
+      status.innerHTML = '<span class="spinner"></span>' +
+        (p < 100 ? "讀取檔案中… " + p + "%" : "分析譜面資訊…");
+    };
+    xhr.onload = () => {
+      let data = {};
+      try { data = JSON.parse(xhr.responseText); } catch (_) {}
+      if (xhr.status === 200) { state = data; renderPick(); }
+      else { showError(data.error || "上傳失敗（HTTP " + xhr.status + "）。"); reset2(); }
+    };
+    xhr.onerror = () => { showError("無法連線到伺服器，請檢查網路。"); reset2(); };
+    xhr.send(file);
+  }
+  function reset2() { $("upbar").classList.add("hidden"); $("upstatus").classList.add("hidden"); }
+
+  const drop = $("drop");
+  $("file").addEventListener("change", (e) => upload(e.target.files[0]));
+  ["dragenter", "dragover"].forEach((t) => drop.addEventListener(t, (e) => { e.preventDefault(); drop.classList.add("over"); }));
+  ["dragleave", "drop"].forEach((t) => drop.addEventListener(t, (e) => { e.preventDefault(); drop.classList.remove("over"); }));
+  drop.addEventListener("drop", (e) => upload(e.dataTransfer.files[0]));
+
+  // ---- 選難度 ----
+  function chartLabel(c) {
+    const warn = c.mode === 1 ? "" : "（非太鼓譜）";
+    return `#${c.index} · ${c.version} · OD ${c.difficulty} · ${c.objects} 個物件${warn}`;
+  }
+  function renderPick() {
+    $("m-title").textContent = state.title;
+    $("m-artist").textContent = state.artist;
+    const rows = $("rows"); rows.textContent = "";
+    COURSES.forEach(([key, zh, en]) => {
+      const row = document.createElement("div"); row.className = "row c-" + key;
+      const label = document.createElement("label"); label.htmlFor = "sel-" + key;
+      label.innerHTML = zh + "<small>" + en + "</small>";
+      const sel = document.createElement("select"); sel.id = "sel-" + key;
+      sel.add(new Option("不輸出", "-1"));
+      state.charts.forEach((c) => sel.add(new Option(chartLabel(c), String(c.index))));
+      sel.value = String(state.suggested[key]);
+      const lv = document.createElement("input"); lv.type = "number"; lv.id = "lv-" + key;
+      lv.className = "lv"; lv.min = "1"; lv.max = "10"; lv.step = "1";
+      lv.setAttribute("aria-label", zh + " 星數（留空使用預設）");
+      lv.title = "星數（1~10），留空使用預設值";
+      const sync = (updateGo) => {
+        const idx = parseInt(sel.value, 10);
+        lv.disabled = idx < 0;
+        if (idx < 0) lv.value = "";
+        lv.placeholder = idx < 0 ? "—" : "預設 " + state.charts[idx].default_level;
+        if (updateGo) syncGo();  // 四列都建好之後才能呼叫
+      };
+      sel.addEventListener("change", () => sync(true));
+      const pick = document.createElement("div"); pick.className = "pick";
+      pick.append(sel, lv);
+      row.append(label, pick); rows.append(row); sync(false);
+    });
+    if (state.charts.some((c) => c.mode !== 1)) {
+      const p = document.createElement("p"); p.className = "note";
+      p.textContent = "標示「非太鼓譜」的是其他 osu! 模式的譜面，也能轉換，但結果可能需要手動調整。";
+      rows.append(p);
+    }
+    syncGo(); show("pick");
+  }
+  function selection() {
+    const s = {};
+    COURSES.forEach(([key]) => { const v = parseInt($("sel-" + key).value, 10); if (v >= 0) s[key] = v; });
+    return s;
+  }
+  function syncGo() { $("go").disabled = Object.keys(selection()).length === 0; }
+  // 讀取自訂星數；留空的不送（後端用預設值）。格式不對回傳 null。
+  function levels() {
+    const out = {};
+    for (const key of Object.keys(selection())) {
+      const raw = $("lv-" + key).value.trim();
+      if (raw === "") continue;
+      const n = Number(raw);
+      if (!Number.isInteger(n) || n < 1 || n > 10) {
+        showError("星數必須是 1 到 10 的整數（留空則使用預設）。");
+        $("lv-" + key).focus();
+        return null;
+      }
+      out[key] = n;
+    }
+    return out;
+  }
+
+  // ---- 轉換 ----
+  $("go").addEventListener("click", async () => {
+    showError("");
+    const lv = levels();
+    if (lv === null) return;
+    const payload = { token: state.token, selection: selection(), levels: lv, encoding: $("enc").value };
+    if (saveMode() === "folder") {
+      const dir = $("outdir").value.trim();
+      if (!dir) { showError("請輸入或選擇要儲存的資料夾。"); $("outdir").focus(); return; }
+      payload.output_dir = dir;
+    }
+    const btn = $("go"); btn.disabled = true;
+    const old = btn.textContent; btn.innerHTML = '<span class="spinner"></span>轉換中…';
+    try {
+      const res = await fetch("/api/convert", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        showError(data.error || "轉換失敗（HTTP " + res.status + "）。");
+        if (res.status === 410) reset();
+        return;
+      }
+      const saved = !!data.saved_to;
+      $("saved").classList.toggle("hidden", !saved);
+      $("next").classList.toggle("hidden", saved);
+      $("dl").classList.toggle("hidden", saved);
+      if (saved) {
+        $("saved").textContent = "已存到：" + data.saved_to + "　到太鼓模擬器重新掃描歌曲，就能選到這首了。";
+      } else {
+        $("dl").href = data.download; $("dl").setAttribute("download", data.filename);
+      }
+      const w = $("warn");
+      w.classList.toggle("hidden", !data.warnings);
+      if (data.warnings) w.textContent = "有 " + data.warnings + " 處需要注意（TJA 內標註為 [Warning]），例如特殊的小節結構，或同一時間疊在一起而被移除的音符。建議在播放器試玩確認節奏是否正確。";
+      show("done");
+    } catch (e) {
+      showError("無法連線到伺服器，請稍後再試。");
+    } finally {
+      btn.textContent = old; syncGo();
+    }
+  });
+
+  $("again").addEventListener("click", reset);
+  $("again2").addEventListener("click", reset);
+  $("back").addEventListener("click", () => show("pick"));
+
+  // ---- 儲存位置 ----
+  function saveMode() {
+    return $("save-box").classList.contains("hidden") ? "zip"
+      : document.querySelector('input[name="save"]:checked').value;
+  }
+  function syncSaveMode() {
+    const folder = saveMode() === "folder";
+    $("folder-row").classList.toggle("hidden", !folder);
+    $("folder-note").classList.toggle("hidden", !folder);
+  }
+  document.querySelectorAll('input[name="save"]').forEach((r) => r.addEventListener("change", syncSaveMode));
+  $("browse").addEventListener("click", async () => {
+    showError("");
+    const btn = $("browse"); btn.disabled = true;
+    try {
+      const res = await fetch("/api/browse", { method: "POST" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) showError(data.error || "無法開啟選擇視窗。");
+      else if (data.path) $("outdir").value = data.path;
+    } catch (_) { showError("無法連線到程式。"); }
+    finally { btn.disabled = false; }
+  });
+
+  fetch("/api/config").then((r) => r.json()).then((c) => {
+    maxMB = c.max_upload_mb; $("maxmb").textContent = maxMB;
+    if (c.direct_save) {
+      $("save-box").classList.remove("hidden");
+      if (c.output_dir) {  // 上次用過資料夾，這次預設也用資料夾
+        $("outdir").value = c.output_dir;
+        document.querySelector('input[name="save"][value="folder"]').checked = true;
+      }
+      syncSaveMode();
+    }
+  }).catch(() => {});
+})();
+</script>
+</body>
+</html>
